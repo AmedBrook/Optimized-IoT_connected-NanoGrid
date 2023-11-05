@@ -39,6 +39,24 @@ The data needed for this project is gathered as following :
 - Previous work on the site.
 
 
+## Approach 
+
+
+### Modelization.
+First, formulating a solvable linear problem based on some constraints, variables and an objective function, then solving the problem using and X solver and finally testing the end results. 
+
+### Integration. 
+We can start with DAQ as data pipline which feeds the optimizer​​​ with the required data as inputs. Then formatting IoT forecasted Data to match the datatype and format used with the Optimizer. and finally populating the optimization output (decision) values within the IoT platform.
+
+### Visualization. 
+Deploying the forecasted Data and the internal IoT network measurements as well as the optimizer outputs data within one visualization web application. 
+
+
+## Architecture. 
+
+![plot](./attachs/Thesis%20roadmap%20architecture.png)
+
+
 
 
 
