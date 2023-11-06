@@ -2,9 +2,7 @@
 
 # IMPORTING LIBRARIES.
 from flask import Flask, render_template
-import numpy as np
 from pulp import *
-from IPython.display import Image
 import plotly
 import plotly.express as px
 import pandas as pd
