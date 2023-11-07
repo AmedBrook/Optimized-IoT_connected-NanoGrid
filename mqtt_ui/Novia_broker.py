@@ -1,6 +1,10 @@
 import paho.mqtt.client as mqtt #importing the client 
 import time #importing time 
 import access_key
+from datetime import datetime
+
+# Getting the current date and time
+dt = datetime.now()
 
 ####
 
@@ -14,7 +18,7 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("open/meteoria/solarRadiation")
 
 def on_message(client, userdata, message): 
-    print('message received', str(message.payload.decode('utf-8')))
+    print('message received', str(message.payload.decode('utf-8')), ':', dt)
     print('message topic is : ',message.topic)
     print('message qos is : ', message.qos)
     print('mesaage retain flag = ', message.retain)
