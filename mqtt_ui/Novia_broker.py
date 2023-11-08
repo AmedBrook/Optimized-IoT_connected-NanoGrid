@@ -18,7 +18,7 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("open/meteoria/solarRadiation")
 
 def on_message(client, userdata, message): 
-    print('message received', str(message.payload.decode('utf-8')), ':', dt)
+    print('message received', str(message.payload.decode('utf-8')),'kWh/m2','=======', dt, '=======')
     print('message topic is : ',message.topic)
     print('message qos is : ', message.qos)
     print('mesaage retain flag = ', message.retain)
