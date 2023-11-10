@@ -54,7 +54,7 @@ Deploying the forecasted Data and the internal IoT network measurements as well 
 
 ## Architecture. 
 
-![plot](./attachs/Thesis%20roadmap%20architecture.png)
+![plot](./docs/Thesis%20roadmap%20architecture.png)
 
 
 
