@@ -3,6 +3,7 @@ import time #importing time
 import access_key
 from datetime import datetime
 from queue import Queue
+import json
 
 # Getting the current date and time
 q=Queue()
@@ -11,22 +12,34 @@ q=Queue()
 username= access_key.username
 password= access_key.password
 
-sub_topic = 'open/meteoria/solarRadiation'
-meseaure = 'Radiation'
+sub_topic = 'open/meteoria/windSpeed'
+meseaure = 'Wind speed'
+unit = 'm/s'
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
     client.subscribe(sub_topic)
 
+
+data = []
+
 def on_message(client, userdata, message): 
-    print('#######', meseaure, ':',str(message.payload.decode('utf-8')),'kWh/m2','#######')
+    
+    i=0
+    while i < 1 :
+        data.append(json.loads(message.payload.decode("utf-8")))
+        i+=1
+
+    print('#######', meseaure, ':',str(message.payload.decode('utf-8')),unit,'#######')
     print('=======', str(datetime.now()), '=======')
     print('message topic is : ',message.topic)
     print('message qos is : ', message.qos)
     print('mesaage retain flag = ', message.retain)
     q.put(message)
+    print('data:',data)
 
+print(data)
 
 def on_log(client, userdata, level, buf):
     print("log: ",buf)
