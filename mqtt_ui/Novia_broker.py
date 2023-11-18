@@ -4,6 +4,7 @@ import access_key
 from datetime import datetime
 from queue import Queue
 import json
+import heo
 
 # Getting the current date and time
 q=Queue()
@@ -37,6 +38,7 @@ def on_message(client, userdata, message):
             if len(data_stream) == 4: 
                 strg=data_stream
                 print('returned list', strg)
+                heo.Optim.solve()
     else : 
         data_stream = []
         i=0
@@ -47,7 +49,7 @@ def on_message(client, userdata, message):
             if len(data_stream) == 4: 
                 strg=data_stream
                 print('returned list:', strg)
-
+                heo.Optim.solve()
 
     print('#######', meseaure, ':',str(message.payload.decode('utf-8')),unit,'#######')
     print('=======', str(datetime.now()), '=======')
