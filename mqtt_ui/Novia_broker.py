@@ -12,9 +12,9 @@ q=Queue()
 username= access_key.username
 password= access_key.password
 
-sub_topic = 'open/meteoria/windSpeed'
-meseaure = 'Wind speed'
-unit = 'm/s'
+sub_topic = 'open/meteoria/airTemp'
+meseaure = 'Temperature'
+unit = 'Deg C'
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
@@ -22,14 +22,32 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(sub_topic)
 
 
-data = []
-
+data, strg = [], []
 def on_message(client, userdata, message): 
     
-    i=0
-    while i < 1 :
-        data.append(json.loads(message.payload.decode("utf-8")))
-        i+=1
+    global data, strg
+
+    
+    if len(data) < 4:    
+       i=0
+       while i < 1 : 
+            log = json.loads(message.payload.decode("utf-8"))
+            data.append(log) 
+            i=i+1 
+            if len(data) == 4: 
+                strg=data
+                print('returned list', strg)
+    else : 
+        data = []
+        i=0
+        while i < 1 : 
+            log = json.loads(message.payload.decode("utf-8"))
+            data.append(log) 
+            i=i+1 
+            if len(data) == 4: 
+                strg=data
+                print('returned list:', strg)
+
 
     print('#######', meseaure, ':',str(message.payload.decode('utf-8')),unit,'#######')
     print('=======', str(datetime.now()), '=======')
@@ -39,7 +57,6 @@ def on_message(client, userdata, message):
     q.put(message)
     print('data:',data)
 
-print(data)
 
 def on_log(client, userdata, level, buf):
     print("log: ",buf)
@@ -70,6 +87,7 @@ client.loop_start() #start the loop
 client.on_log=on_log #printing log information
 print("Subscribing to topic", sub_topic)
 client.subscribe(sub_topic)
+print('data:',data)
 
 
 def publish(client):
