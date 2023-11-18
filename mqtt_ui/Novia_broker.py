@@ -22,30 +22,30 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(sub_topic)
 
 
-data, strg = [], []
+data_stream, strg = [], []
 def on_message(client, userdata, message): 
     
-    global data, strg
+    global data_stream, strg
 
     
-    if len(data) < 4:    
+    if len(data_stream) < 4:    
        i=0
        while i < 1 : 
             log = json.loads(message.payload.decode("utf-8"))
-            data.append(log) 
+            data_stream.append(log) 
             i=i+1 
-            if len(data) == 4: 
-                strg=data
+            if len(data_stream) == 4: 
+                strg=data_stream
                 print('returned list', strg)
     else : 
-        data = []
+        data_stream = []
         i=0
         while i < 1 : 
             log = json.loads(message.payload.decode("utf-8"))
-            data.append(log) 
+            data_stream.append(log) 
             i=i+1 
-            if len(data) == 4: 
-                strg=data
+            if len(data_stream) == 4: 
+                strg=data_stream
                 print('returned list:', strg)
 
 
@@ -55,7 +55,7 @@ def on_message(client, userdata, message):
     print('message qos is : ', message.qos)
     print('mesaage retain flag = ', message.retain)
     q.put(message)
-    print('data:',data)
+    print('data_stream:',data_stream)
 
 
 def on_log(client, userdata, level, buf):
@@ -87,7 +87,7 @@ client.loop_start() #start the loop
 client.on_log=on_log #printing log information
 print("Subscribing to topic", sub_topic)
 client.subscribe(sub_topic)
-print('data:',data)
+print('returned list:', strg)
 
 
 def publish(client):
