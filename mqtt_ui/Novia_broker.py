@@ -13,9 +13,9 @@ q=Queue()
 username= access_key.username
 password= access_key.password
 
-sub_topic = 'open/meteoria/airTemp'
-meseaure = 'Temperature'
-unit = 'Deg C'
+sub_topic = 'open/meteoria/windSpeed'
+meseaure = 'Solar Power'
+unit = 'Wh'
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
@@ -24,29 +24,37 @@ def on_connect(client, userdata, flags, rc):
 
 
 data_stream, strg = [], []
+stream_dict = {}
+steps=[k for k in range (0,9)]
 def on_message(client, userdata, message): 
     
-    global data_stream, strg
+    global data_stream, strg, stream_dict
 
-    
-    if len(data_stream) < 4:    
-       i=0
-       while i < 1 : 
-            log = json.loads(message.payload.decode("utf-8"))
-            data_stream.append(log) 
-            i=i+1 
-            if len(data_stream) == 4: 
-                strg=data_stream
-                print('returned list', strg)
-                heo.Optim.solve()
-    else : 
-        data_stream = []
-        i=0
+    i=0
+    if len(data_stream) < 10:    
+       for j in range(0,9): 
         while i < 1 : 
             log = json.loads(message.payload.decode("utf-8"))
             data_stream.append(log) 
-            i=i+1 
-            if len(data_stream) == 4: 
+            stream_dict = dict(zip(steps, data_stream))
+            i+=1
+            j+=1
+            if len(data_stream) == 10: 
+                strg=data_stream
+                print('returned list', strg)
+                heo.Optim.solve()
+       
+
+    else : 
+        data_stream = []
+        i=0
+        for j in range(10):
+         while i < 1 : 
+            log = json.loads(message.payload.decode("utf-8"))
+            data_stream.append(log)
+            stream_dict[j] = data_stream[j] 
+            i+=1
+            if len(data_stream) == 10: 
                 strg=data_stream
                 print('returned list:', strg)
                 heo.Optim.solve()
@@ -58,6 +66,7 @@ def on_message(client, userdata, message):
     print('mesaage retain flag = ', message.retain)
     q.put(message)
     print('data_stream:',data_stream)
+    print('Returned dict:', stream_dict)
 
 
 def on_log(client, userdata, level, buf):
