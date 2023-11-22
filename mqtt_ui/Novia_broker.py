@@ -13,7 +13,7 @@ q=Queue()
 username= access_key.username
 password= access_key.password
 
-sub_topic = 'open/meteoria/windSpeed'
+sub_topic = 'open/meteoria/energy/solarChargeWh'
 meseaure = 'Solar Power'
 unit = 'Wh'
 
