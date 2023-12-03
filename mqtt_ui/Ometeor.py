@@ -161,6 +161,6 @@ for v in Optim.variables():
 
 
 ### Calculating the optimized fuel comsumption.
-print("Total fuel comsumption of the trip:", value(Optim.objective),'kg') 
+print("Actual total fuel comsumption:", value(Optim.objective),'kg') 
 print('Optimization done!')
 
