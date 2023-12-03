@@ -4,7 +4,7 @@ import access_key
 from datetime import datetime
 from queue import Queue
 import json
-import heo
+import Ometeor
 
 # Getting the current date and time
 q=Queue()
@@ -13,9 +13,9 @@ q=Queue()
 username= access_key.username
 password= access_key.password
 
-sub_topic = 'open/meteoria/energy/solarChargeWh'
-meseaure = 'Solar Power'
-unit = 'Wh'
+sub_topic = 'open/meteoria/solarRadiation'
+meseaure = 'Solar Irradiation'
+unit = 'W/m^2'
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
@@ -42,7 +42,7 @@ def on_message(client, userdata, message):
             if len(data_stream) == 10: 
                 strg=data_stream
                 print('returned list', strg)
-                heo.Optim.solve()
+                Ometeor.Optim.solve()
        
 
     else : 
@@ -57,7 +57,7 @@ def on_message(client, userdata, message):
             if len(data_stream) == 10: 
                 strg=data_stream
                 print('returned list:', strg)
-                heo.Optim.solve()
+                Ometeor.Optim.solve()
 
     print('#######', meseaure, ':',str(message.payload.decode('utf-8')),unit,'#######')
     print('=======', str(datetime.now()), '=======')
