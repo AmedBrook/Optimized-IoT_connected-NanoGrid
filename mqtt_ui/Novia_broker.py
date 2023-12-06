@@ -14,7 +14,7 @@ username= access_key.username
 password= access_key.password
 
 sub_topic = 'open/meteoria/solarRadiation'
-meseaure = 'Solar Irradiation'
+var = 'Irr_sol'
 unit = 'W/m^2'
 
 # The callback for when the client receives a CONNACK response from the server.
@@ -24,49 +24,51 @@ def on_connect(client, userdata, flags, rc):
 
 
 data_stream, strg = [], []
-stream_dict = {}
+Irr_sol = {}
 steps=[k for k in range (0,9)]
 def on_message(client, userdata, message): 
     
-    global data_stream, strg, stream_dict
+    global data_stream, strg, Irr_sol
 
     i=0
-    if len(data_stream) < 10:    
+    if len(data_stream) < 10 :    
        for j in range(0,9): 
         while i < 1 : 
             log = json.loads(message.payload.decode("utf-8"))
             data_stream.append(log) 
-            stream_dict = dict(zip(steps, data_stream))
+            Irr_sol = dict(zip(steps, data_stream))
             i+=1
             j+=1
             if len(data_stream) == 10: 
                 strg=data_stream
                 print('returned list', strg)
                 Ometeor.Optim.solve()
-       
-
+        
     else : 
+        with open("Irr_sol.txt", "a+") as file:
+                    file.write("%s" %(Irr_sol)+ "\n")
         data_stream = []
         i=0
         for j in range(10):
          while i < 1 : 
             log = json.loads(message.payload.decode("utf-8"))
             data_stream.append(log)
-            stream_dict[j] = data_stream[j] 
+            Irr_sol[j] = data_stream[j] 
             i+=1
-            if len(data_stream) == 10: 
+            if len(data_stream) == 10:  
                 strg=data_stream
                 print('returned list:', strg)
                 Ometeor.Optim.solve()
+                
 
-    print('#######', meseaure, ':',str(message.payload.decode('utf-8')),unit,'#######')
+    print('#######', var, ':',str(message.payload.decode('utf-8')),unit,'#######')
     print('=======', str(datetime.now()), '=======')
     print('message topic is : ',message.topic)
     print('message qos is : ', message.qos)
     print('mesaage retain flag = ', message.retain)
     q.put(message)
     print('data_stream:',data_stream)
-    print('Returned dict:', stream_dict)
+    print(var,':', Irr_sol)   
 
 
 def on_log(client, userdata, level, buf):
@@ -86,7 +88,7 @@ broker_address='iot.novia.fi'
 print('Creating new instance of the client')
 client=mqtt.Client() 
 client.on_message=on_message #attach function to callback
-print("connecting to broker")
+print("connecting to Novia broker..")
 
 client.on_connect = on_connect
 client.username_pw_set(username, password)
