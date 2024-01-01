@@ -23,7 +23,7 @@ Q_0 = 0.1*Q_max                                               # inital capacity 
 Q_final = 0.2*Q_max                                           # Final capacity stored on the battery. 
 eff_to_bss = 0.9                                              # battery charging efficiency.
 eff_from_bss = 0.9                                            # battery transfer efficiency. 
-P_max = 15                                                    # max output from gen set A.
+P_max = 3000                                          # max output from gen set A.
 P_min = 0                                                     # min output from gen set A.        
 dt = 1                                                        # simulation time step dt.
 t_max = 10                                                    # time span for simulation = t_max hours.
@@ -38,19 +38,24 @@ Q_h = 135000                                                  # Estimated heat l
 T_H = 21                                                      # Inside temperature (°C) (barn temperature). 
 S_pv30 = 24                                                   # Solar PV modules surface. 
 
+''''
 
 Irr_list = []
 df = pd.read_csv('Irr_sol.csv')
-for i in df.iloc[5,:]: 
+for i in df.iloc[-1,:]: 
     Irr_list.append(float(i))
     Irr_sol_dict = dict(zip(V_steps, Irr_list))
 
 print(Irr_list)
 print(Irr_sol_dict)
+print('last row', df.iloc[-1,:])
 
 
-# P_pv30 = {k:Irr_sol_dict[k] * S_pv30 for k in V_steps}        # = Irr_sol[k]*S_pv30 for k in V_steps
-#print(P_pv30)
+
+P_pv30 = {k:Irr_sol_dict[k] * S_pv30 for k in V_steps}        # = Irr_sol[k]*S_pv30 for k in V_steps
+print('P_pv30 = ',P_pv30)
+
+'''
 
 P_wind = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0}
 P_pv30 = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0}
@@ -84,7 +89,7 @@ L = lwd (10, 5, 8,                                            # Typical Power re
                 3, 7, 30,
                 0, 5, 20, 30)   
 '''
-
+print('load =', L)
 
 ### Creating the problem variable. 
 Optim = LpProblem('Energy_Opt',LpMinimize)
@@ -138,7 +143,7 @@ print(FC)
 for k in V_steps:
 
   # Fuel oil consumption constraint.
-  Optim += FOC[k] == P[k]*a_j + b_j - fc_offset*Y[k]     
+  Optim += FOC[k] == P[k]*a_j + (b_j - fc_offset)*Y[k]     
   Optim += P_res[k] == P_pv30[k] + P_pv60[k] + P_wind[k] 
   Optim += P_res[k] >= P_min * Y_res[k]
   Optim += Y_res[k] >= 1
@@ -183,7 +188,7 @@ for v in Optim.variables():
 
 
 ### Calculating the optimized fuel comsumption.
-print("Actual total fuel comsumption:", value(Optim.objective),'kg') 
+print("Actual total fuel comsumption:", value(Optim.objective),'g') 
 print('Optimization done!')
 
 ## Genset bublished Binnary commands logic 
