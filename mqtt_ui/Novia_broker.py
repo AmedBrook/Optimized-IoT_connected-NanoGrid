@@ -7,6 +7,10 @@ from src.functions.fuel_consumption import fuelCon
 from src.functions.load_window import lwd 
 from queue import Queue
 import json
+from dash import Dash, dcc, html, Input, Output, callback
+import plotly.express as px
+import plotly 
+
 
 import pandas as pd
 import numpy as np
@@ -32,12 +36,13 @@ n = len(t)                                                    # number of time s
 m = 1                                                         # number of Gensets used on the trip, 1 is used.
 fc_offset = 190                                               # genset j fuel consumption when no power gnerated (p=0) in g/h.
 V_steps = [x for x in range(0,n)]                             # Time steps vector. 
-P_pub = [0 for x in range(0,n)] 
+#P_pub = [0 for x in range(0,n)] 
 V_steps_z = V_steps[:-1]                                      # Time steps vector without the final step. 
 Q_h = { x:135000 for x in V_steps}                            # Estimated heat loss when temp drops. 1 kJ/h = 0.0002777778 kW
 T_H = {x:21 for x in V_steps}                                 # Inside temperature (°C) (barn temperature). 
 S_pv30 = 24                                                   # total solar PV modules surface. 
 Ones = {x:1 for x in V_steps}
+ZeroOffset = {x:0.001 for x in V_steps}
 
 
 
@@ -102,7 +107,7 @@ steps=[k for k in range (0,9)]
 
 def on_message(client, userdata, message): 
     
-    
+    global P_pub, Optim
     Irr_list = []
     df_irr = pd.read_csv('Irr_sol.csv')
     df_irr_drop = df_irr.dropna()
@@ -126,14 +131,13 @@ def on_message(client, userdata, message):
         T_L_dict = dict(zip(V_steps, T_L))
 
 
-
     P_pv30 = {k:Irr_sol_dict[k] * S_pv30 for k in V_steps}        
     print('P_pv30 = ',P_pv30)
 
-    P_wind = {k:Wind_vlct_dict[k] ** 3 * (6 ** 2) * np.pi *  1.225 * 0.45 * (1/2) for k in V_steps}        # = Irr_sol[k]*S_pv30 for k in V_steps
+    P_wind = {k:(Wind_vlct_dict[k] ** 3) * (6 ** 2) * np.pi *  1.225 * 0.45 * (1/2) for k in V_steps}        # = Irr_sol[k]*S_pv30 for k in V_steps
     print('P_wind = ', P_wind)
-
-    P_to_hp = {k:(Q_h[k] / Ones[k] / (Ones[k] - T_L_dict[k]) / T_H[k])*10**(-3) for k in V_steps}
+    cop_hp = {k:Ones[k] / (Ones[k] - (T_L_dict[k] / T_H[k])) for k in V_steps}
+    P_to_hp = {k:(Q_h[k] / cop_hp[k])*10**(-3) for k in V_steps}
     print('P_to_hp = ', P_to_hp)
     global data_stream_Irr, data_stream_wind, data_stream_Temp, strg_Irr, strg_wind, strg_Temp, P_pub
 
@@ -166,6 +170,7 @@ def on_message(client, userdata, message):
 
                 ###############################  OPTIMIZATION ###################################################################
                 
+                global Optim
                 Optim = LpProblem('Energy_Opt',LpMinimize)
                 
                 ### Slope, intercept and maximum fuel bound calculation.
@@ -173,7 +178,7 @@ def on_message(client, userdata, message):
                 b_j = fuelCon(0.2*P_max, P_max) - a_j*0.2*P_max #Intercept.
                 FOC_max = fuelCon(0.9*P_max,P_max) # Max fuel bound.
 
-
+                global P 
                 ### Setting-up decision Variables.
                 Q_bss = LpVariable.dicts("Q_bss", V_steps, lowBound=0.2*Q_max, cat=LpContinuous)  # Battery charge at time step k.
                 P_from_bss = LpVariable.dicts("P_from_bss", V_steps, lowBound=P_min, cat=LpContinuous) # Power transfered from the battery to the load.
@@ -203,6 +208,7 @@ def on_message(client, userdata, message):
                 #Y_pv60 = LpVariable.dicts("Y_pv60", V_steps, lowBound=0, upBound=1, cat=LpBinary) # Binary state of solar panels tilted by 60°.
                 Y_res = LpVariable.dicts("Y_res", V_steps, lowBound=0, upBound=1, cat=LpBinary) # Binary state RES.
                 Null = LpVariable.dict("Null", V_steps, lowBound=0, upBound=0,cat=LpBinary) # Reference variable
+                #P_pub = LpVariable.dict("P_pub", V_steps, lowBound=0, upBound=1, cat=LpBinary)
 
 
                 ### Setting-up the objective function.
@@ -218,9 +224,9 @@ def on_message(client, userdata, message):
 
                     # Fuel oil consumption constraint.
                     Optim += FOC[k] == P[k]*a_j + (b_j - fc_offset)*Y[k]     
-                    Optim += P_res[k] == P_pv30[k] + P_pv60[k] + P_wind[k] 
-                    #Optim += P_res[k] >= P_min * Y_res[k]
-                    #Optim += Y_res[k] >= 1
+                    Optim += P_res[k] <= P_pv30[k] + P_pv60[k] + P_wind[k] 
+                    Optim += P_res[k] >= P_min * Y_res[k]
+                    Optim += Y_res[k] >= 1
                     Optim += P_load[k] + eff_from_bss*P_from_bss[k] + P_res[k] >= P_to_hp[k] + P_stnb[k]
                     Optim += P_load[k] == P_to_hp[k] + P_to_sh[k]
                     Optim += P_load[k] + P_stnb[k] <= P[k] + P_res[k]
@@ -232,11 +238,13 @@ def on_message(client, userdata, message):
                     Optim += P_to_sh[k] <= 0.9*P_max * Y_sh[k]
                     Optim += P[k]  <= P_max * Y[k]
                     Optim += P[k]  >= P_min * Y[k]
+                    
                     #Optim += Y[k] + Y_res[k] >= 0
                     Optim += Y[k] <= 1
                     Optim += P_to_bss[k] <= eff_to_bss * P_max * Y_to_bss[k]
                     Optim += P_from_bss[k] <= eff_from_bss * P_max * Y_from_bss[k]
                     Optim += Y_to_bss[k] + Y_from_bss[k]  <= 1
+                    
                     if k == V_steps[0] :                                            
                         Optim += Q_bss[k] == Q_0 + eff_to_bss*P_to_bss[k]*dt - P_from_bss[k]*dt
                     else :  
@@ -245,7 +253,7 @@ def on_message(client, userdata, message):
                     for k in range(V_steps[0], V_steps[-1]): 
                         Optim += Z[k] >= Y[k + 1] - Y[k] 
                     Optim += Q_bss[V_steps[-1]] == Q_final
-                                    
+                    
                     ### Solving the problem.
                     status = Optim.solve(GUROBI())
 
@@ -267,15 +275,17 @@ def on_message(client, userdata, message):
                     print('P_to_hp'  , P_to_hp)
                     print('##############################################')
 
-                    ## Genset published Binnary commands logic 
+                    ## Genset published Binnary commands
+                    global P_pub
+                    P_pub = []
                     for v in Optim.variables():
                         for i in V_steps:
-                            if v.name == ('P_'+ str(i)):
-                                if v.varValue == 0: 
-                                    P_pub[i] = 0
+                            if v.name == ('Y_'+ str(i)):
+                                if v.varValue == 1: 
+                                    P_pub.append(1)
                                 else : 
-                                    P_pub[i] = 1
-                                    
+                                    P_pub.append(0)
+              
                     ###############################  OPTIMIZATION END ###################################################################
 
     else : 
@@ -310,7 +320,8 @@ def on_message(client, userdata, message):
         P_wind = {k:Wind_vlct_dict[k] ** 3 * (6 ** 2) * np.pi *  1.225 * 0.45 * (1/2) for k in V_steps}        # = Irr_sol[k]*S_pv30 for k in V_steps
         print('P_wind = ', P_wind)
 
-        P_to_hp = {k:(Q_h[k] / Ones[k] / (Ones[k] - T_L_dict[k]) / T_H[k])*10**(-3) for k in V_steps}
+        cop_hp = {k:Ones[k] / (Ones[k] - (T_L_dict[k] / T_H[k])) for k in V_steps}
+        P_to_hp = {k:(Q_h[k] / cop_hp[k])*10**(-3) for k in V_steps}
         print('P_to_hp = ', P_to_hp)
 
         P_stnb = {x:3000 for x in V_steps}
@@ -416,6 +427,7 @@ def on_message(client, userdata, message):
                 #Y_pv60 = LpVariable.dicts("Y_pv60", V_steps, lowBound=0, upBound=1, cat=LpBinary) # Binary state of solar panels tilted by 60°.
                 Y_res = LpVariable.dicts("Y_res", V_steps, lowBound=0, upBound=1, cat=LpBinary) # Binary state RES.
                 Null = LpVariable.dict("Null", V_steps, lowBound=0, upBound=0,cat=LpBinary) # Reference variable
+                #P_pub = LpVariable.dict("P_pub", V_steps, lowBound=0, upBound=1, cat=LpBinary)
 
                 ### Setting-up the objective function.
                 FC = sum(FOC[k] for k in V_steps) * dt/1000  # sum of the fuel oil comsumption for all gensets over all k steps.
@@ -431,9 +443,9 @@ def on_message(client, userdata, message):
                     
                     # Fuel oil consumption constraint.
                     Optim += FOC[k] == P[k]*a_j + (b_j - fc_offset)*Y[k]     
-                    Optim += P_res[k] == P_pv30[k] + P_pv60[k] + P_wind[k] 
-                    #Optim += P_res[k] >= P_min * Y_res[k]
-                    #Optim += Y_res[k] >= 1
+                    Optim += P_res[k] <= P_pv30[k] + P_pv60[k] + P_wind[k] 
+                    Optim += P_res[k] >= P_min * Y_res[k]
+                    Optim += Y_res[k] >= 1
                     Optim += P_load[k] + eff_from_bss*P_from_bss[k] + P_res[k] >= P_to_hp[k] + P_stnb[k]
                     Optim += P_load[k] == P_to_hp[k] + P_to_sh[k]
                     Optim += P_load[k] + P_stnb[k] <= P[k] + P_res[k]
@@ -445,11 +457,13 @@ def on_message(client, userdata, message):
                     Optim += P_to_sh[k] <= 0.9*P_max * Y_sh[k]
                     Optim += P[k]  <= P_max * Y[k]
                     Optim += P[k]  >= P_min * Y[k]
+                    
                     #Optim += Y[k] + Y_res[k] >= 0
                     Optim += Y[k] <= 1
                     Optim += P_to_bss[k] <= eff_to_bss * P_max * Y_to_bss[k]
                     Optim += P_from_bss[k] <= eff_from_bss * P_max * Y_from_bss[k]
                     Optim += Y_to_bss[k] + Y_from_bss[k]  <= 1
+                    
                     if k == V_steps[0] :                                            
                         Optim += Q_bss[k] == Q_0 + eff_to_bss*P_to_bss[k]*dt - P_from_bss[k]*dt
                     else :  
@@ -458,7 +472,7 @@ def on_message(client, userdata, message):
                     for k in range(V_steps[0], V_steps[-1]): 
                         Optim += Z[k] >= Y[k + 1] - Y[k] 
                     Optim += Q_bss[V_steps[-1]] == Q_final
-                                    
+                     
                     ### Solving the problem.
                     status = Optim.solve(GUROBI())
 
@@ -477,18 +491,25 @@ def on_message(client, userdata, message):
                     print('##############################################')
                     print('P_pv30 : ', P_pv30)
                     print('P_wind : ', P_wind)
-                    print('P_to_hp'  , P_to_hp)
+                    print('P_to_hp: '  , P_to_hp)
                     print('##############################################')
 
                     ## Genset published Binnary commands logic 
+                    P_pub =[]
+                    for v in Optim.variables():
+                        for i in V_steps:
+                            if v.name == ('Y_'+ str(i)):
+                                if v.varValue == 1: 
+                                    P_pub.append(1)
+                                else : 
+                                    P_pub.append(0)
+                    global P_list 
+                    P_list = []
                     for v in Optim.variables():
                         for i in V_steps:
                             if v.name == ('P_'+ str(i)):
-                                if v.varValue == 0: 
-                                    P_pub[i] = 0
-                                else : 
-                                    P_pub[i] = 1
-                                    
+                                P_list.append(v.varValue)
+
                     ###############################  OPTIMIZATION END ###################################################################
    
 
@@ -565,9 +586,13 @@ print('returned list:', strg_wind)
 print('returned list:', strg_Temp)
 
 
+
 def publish(client):
-    for i in P_pub: 
-        msg = P_pub[i]
+    
+    global P_pub
+    for k in V_steps: 
+        msg = P_pub[k]
+    print('P_pub:', P_pub)
     pub_topic = 'meteoria/optimizer/gensetControl'
     
     while True:
@@ -579,8 +604,83 @@ def publish(client):
             print(f"Send `{msg}` to topic `{pub_topic}`")
         else:
             print(f"Failed to send message to topic {pub_topic}")
+    
 
 
+
+
+
+
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = Dash(__name__, external_stylesheets=external_stylesheets)
+app.layout = html.Div(
+    html.Div([
+        html.H4('Meteoria power dashboard'),
+        html.Div(id='live-update-text'),
+        dcc.Graph(id='live-update-graph'),
+        dcc.Interval(
+            id='interval-component',
+            interval=1*1000, # in milliseconds
+            n_intervals=0
+        )
+    ])
+)
+
+# Multiple components can update everytime interval gets fired.
+@callback(Output('live-update-graph', 'figure'),
+              Input('interval-component', 'n_intervals'))
+def update_graph_live(n):
+    
+# Power generated by the Genset.(Chart 1)    
+    P_A_dframe = {
+             'Power generated by the Genset.': P_list,
+             'Scale' : P_list}
+
+    P_A_df = pd.DataFrame(P_A_dframe)
+    fig = px.bar(P_A_df, x = V_steps,
+             y = P_list,
+             title = '________Power Generated By The Genset A._________',
+             labels = dict(x = "Time Step (h)", y = "Power(kw)"), text_auto = True)
+    fig.show()
+    
+
+'''   
+
+@callback(Output('live-update-graph', 'figure'),
+              Input('interval-component', 'n_intervals'))
+def update_graph_live(n):
+    data = {
+        'time': [],
+        'Genset_power': P_list,
+       
+    }
+
+    # Collect some data
+    for i in range(180):
+        time = datetime.datetime.now() - datetime.timedelta(seconds=i*20)
+        data['time'].append(time)
+
+    # Create the graph with subplots
+    fig = plotly.tools.make_subplots(rows=1, cols=1, vertical_spacing=0.2)
+    fig['layout']['margin'] = {
+        'l': 30, 'r': 10, 'b': 30, 't': 10
+    }
+    fig['layout']['legend'] = {'x': 0, 'y': 1, 'xanchor': 'left'}
+
+    fig.append_trace({
+        'x': data['time'],
+        'y': data['Genset_power'],
+        'name': 'Genset power',
+        'mode': 'lines+markers',
+        'type': 'scatter'
+    }, 1, 1)
+
+    return fig
+
+'''
+    
 
 def run():
     publish(client)
@@ -588,4 +688,11 @@ def run():
 
 if __name__ == '__main__':
     run()
+    app.run(debug=True)
 
+
+
+
+
+
+# Constructing list out of the P_A vector.
