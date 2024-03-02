@@ -36,7 +36,7 @@ n = len(t)                                                    # number of time s
 m = 1                                                         # number of Gensets used on the trip, 1 is used.
 fc_offset = 190                                               # genset j fuel consumption when no power gnerated (p=0) in g/h.
 V_steps = [x for x in range(0,n)]                             # Time steps vector. 
-#P_pub = [0 for x in range(0,n)] 
+P_pub = [x for x in range(0,n)] 
 V_steps_z = V_steps[:-1]                                      # Time steps vector without the final step. 
 Q_h = { x:135000 for x in V_steps}                            # Estimated heat loss when temp drops. 1 kJ/h = 0.0002777778 kW
 T_H = {x:21 for x in V_steps}                                 # Inside temperature (°C) (barn temperature). 
@@ -107,7 +107,7 @@ steps=[k for k in range (0,9)]
 
 def on_message(client, userdata, message): 
     
-    global P_pub, Optim
+    global P_pub, P_list, Optim
     Irr_list = []
     df_irr = pd.read_csv('Irr_sol.csv')
     df_irr_drop = df_irr.dropna()
@@ -276,8 +276,7 @@ def on_message(client, userdata, message):
                     print('##############################################')
 
                     ## Genset published Binnary commands
-                    global P_pub
-                    P_pub = []
+                    P_pub =[]
                     for v in Optim.variables():
                         for i in V_steps:
                             if v.name == ('Y_'+ str(i)):
@@ -538,7 +537,9 @@ def on_message(client, userdata, message):
     print('mesaage retain flag = ', message.retain)
     q.put(message)
     print('data_stream:',data_stream_Temp)
-    print(mes3,':', data_stream_Temp)   
+    print(mes3,':', data_stream_Temp) 
+
+    print('#######', 'P_pub :', P_pub,'#######')
 
 
 '''
@@ -587,26 +588,27 @@ print('returned list:', strg_Temp)
 
 
 
+
+
 def publish(client):
+
+    global Optim, P_pub
     
-    global P_pub
     for k in V_steps: 
-        msg = P_pub[k]
-    print('P_pub:', P_pub)
-    pub_topic = 'meteoria/optimizer/gensetControl'
-    
-    while True:
-        sleep(1)
-        result = client.publish(pub_topic, msg)
-        # result: [0, 1]
-        status = result[0]
-        if status == 0:
-            print(f"Send `{msg}` to topic `{pub_topic}`")
-        else:
-            print(f"Failed to send message to topic {pub_topic}")
-    
-
-
+        #msg = P_pub[k]
+        print('P_pub:', P_pub)
+        pub_topic = 'meteoria/optimizer/gensetControl'
+        
+        while True:
+            sleep(1)
+            result = client.publish(pub_topic, P_pub[k])
+            # result: [0, 1]
+            status = result[0]
+            if status == 0:
+                print(f"Send `{P_pub[k]}` to topic `{pub_topic}`")
+            else:
+                print(f"Failed to send message to topic {pub_topic}")
+            
 
 
 
